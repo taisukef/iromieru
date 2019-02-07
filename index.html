@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>iromieru AR (いろみえるAR)</title>
+<meta property="og:image" content="iromieru.jpg">
+<link rel="apple-touch-icon" href="iromieru.jpg"/>
+<meta name="viewport" content="width=device-width"/>
+<script src="fukuno.js"></script>
+<script src="colorjis.js"></script>
+<script>"use strict";
+
+var getNearColor = function(rgb) {
+	var r = (rgb >> 16) & 0xff;
+	var g = (rgb >> 8) & 0xff;
+	var b = rgb & 0xff;
+	var min = 100000;
+	var nmin = 0;
+	for (var i = 0; i < COLOR.length; i++) {
+		var c = COLOR[i][0];
+		var r2 = c >> 16;
+		var g2 = (c >> 8) & 0xff;
+		var b2 = c & 0xff;
+		var dif = Math.abs(r - r2) + Math.abs(g - g2) + Math.abs(b - b2);
+		if (dif < min) {
+			min = dif;
+			nmin = i;
+		}
+	}
+	return COLOR[nmin];
+}
+
+window.onload = function() {
+	startAR()
+}
+
+const startAR = function(callback) {
+	const USE_CAMERA_FRONT = false;
+//	var videoop = USE_CAMERA_FRONT ? true : { facingMode : { exact : "environment" } };
+//	var videoop = USE_CAMERA_FRONT ? true : { facingMode : { ideal : "environment" } };
+	var videoop = USE_CAMERA_FRONT ? true : {
+		facingMode : { ideal : "environment" },
+		width: { min: 640, ideal: 1920 },
+		height: { min: 480, ideal: 1080 }
+//		width: { min: 640, ideal: 1280, max: 1920 },
+//		height: { min: 480, ideal: 720, max: 1080 }
+	};
+	const medias = { audio: false, video: videoop };
+	
+//	dump(navigator.mediaDevices.getSupportedConstraints());
+	
+	navigator.getUserMedia(medias, function(stream) {
+			video.srcObject = stream;
+		},
+		function(err) {
+			alert(err);
+		}
+	);
+	
+	
+	
+	var g = canvas.getContext("2d");
+	var cnt = 0;
+	// color
+	var nearcol = getNearColor(0);
+
+	var draw = function() {
+		const cw = window.innerWidth * window.devicePixelRatio;
+		const ch = window.innerHeight * window.devicePixelRatio;
+		canvas.width = cw;
+		canvas.height = ch;
+		
+		const vw = video.videoWidth;
+		const vh = video.videoHeight;
+		const cw2 = cw // / 2;
+		const caspect = ch / cw2;
+		const vaspect = vh / vw;
+		
+		const fitwidth = caspect < vaspect; // auto fit screen
+		//const fitwidth = true; // force fit width
+		//const fitwidth = false; // force fit height
+		
+		var pos = [];
+		if (fitwidth) {
+			const vh2 = vw * caspect;
+			if (vh2 > vh) {
+				const cy = (vh2 - vh) / 2 / (vw / cw2);
+				const ch2 = cw2 * vaspect;
+				g.drawImage(video, 0, 0, vw, vh, 0, cy, cw2, ch2);
+				//g.drawImage(video, 0, 0, vw, vh, cw2, cy, cw2, ch2);
+				pos = [ 0, cy, cw2, ch2, cw2, cy, cw2, ch2 ];
+			} else {
+				const vy = (vh - vh2) / 2;
+				g.drawImage(video, 0, vy, vw, vh2, 0, 0, cw2, ch);
+				//g.drawImage(video, 0, vy, vw, vh2, cw2, 0, cw2, ch);
+				pos = [ 0, 0, cw2, ch, cw2, 0, cw2, ch ];
+			}
+		} else {
+			const vw2 = vh / caspect;
+			if (vw2 > vw) {
+				const cx = (vw2 - vw) / 2 / (vh / ch);
+				const cw3 = ch / vaspect;
+				g.drawImage(video, 0, 0, vw, vh, cx, 0, cw3, ch);
+				//g.drawImage(video, 0, 0, vw, vh, cw2 + cx, 0, cw3, ch);
+				pos = [ cx, 0, cw3, ch, cw2 + cx, 0, cw3, ch ];
+			} else {
+				const vx = (vw - vw2) / 2;
+				g.drawImage(video, vx, 0, vw2, vh, 0, 0, cw2, ch);
+				//g.drawImage(video, vx, 0, vw2, vh, cw2, 0, cw2, ch);
+				pos = [ 0, 0, cw2, ch, cw2, 0, cw2, ch ];
+			}
+		}
+		
+		var drawText = function(s, x, y) {
+			for (var i = 0; i < 8; i += 4) {
+				g.strokeText(s, pos[i] + x * pos[i + 2], pos[i + 1] + y * pos[i + 3]);
+				g.fillText(s, pos[i] + x * pos[i + 2], pos[i + 1] + y * pos[i + 3]);
+			}
+		};
+		var fillRect = function(x, y, w, h) {
+			for (var i = 0; i < 8; i += 4) {
+				g.fillRect(pos[i] + x * pos[i + 2], pos[i + 1] + y * pos[i + 3], w * pos[i + 2], h * pos[i + 3]);
+			}
+		};
+				
+
+		var ox = pos[0] + pos[2] / 2;
+		var oy = pos[1] + pos[3] / 2;
+
+//		g.drawImage(img, ox - img.width / 2, oy - img.height / 2)
+		const drawRect2 = function(x, y, w, h) {
+			g.fillStyle = "rgb(0, 0, 0)";
+			g.strokeStyle = "rgb(0, 0, 0)";
+			g.fillRect(x - 1, y - 1, w + 2, h + 2)
+			g.fillStyle = "rgb(255, 255, 255)";
+			g.strokeStyle = "rgb(255, 255, 255)";
+			g.fillRect(x, y, w, h)
+		}
+		const lw = ox / 8
+		const sw = lw / 8
+		drawRect2(ox - lw - sw, oy, lw, 1)
+		drawRect2(ox + sw, oy, lw, 1)
+		drawRect2(ox, oy - lw - sw, 1, lw)
+		drawRect2(ox, oy + sw, 1, lw)
+		
+		const pickColor = function(ox, oy) {
+			var sum = [ 0, 0, 0 ];
+			var ncol = 0;
+			var data = g.getImageData(ox - 1, oy - 1, 3, 3);
+			for (var i = 0; i < 9; i++) {
+				for (var j = 0; j < 3; j++) {
+					sum[j] += data.data[i * 4 + j];
+				}
+			}
+			for (var i = 0; i < 3; i++) {
+				sum[i] = Math.floor(sum[i] / 9);
+				ncol += sum[i] << (16 - 8 * i);
+			}
+			return ncol
+		}
+		const toHexRGB = function(ncol) {
+			var col = "#";
+			for (var i = 0; i < 3; i++) {
+				var val = (ncol >> (16 - i * 8)) & 0xff
+				var h = val.toString(16);
+				if (h.length < 2) {
+					col += "0";
+				}
+				col += h;
+			}
+			return col
+		}
+		if (cnt % 20 == 0) {
+			var color = pickColor(ox, oy)
+			nearcol = getNearColor(color);
+		}
+
+		g.fillStyle = toHexRGB(nearcol[0])
+//		console.log(color, toHexRGB(color))
+		const colh = pos[3] / 5
+		const colw = pos[2] * 9 / 10
+		const colwgap = (pos[2] - colw) / 2
+		g.fillRect(pos[0] + colwgap, pos[1] + (pos[3] - colwgap - colh), colw, colh)
+
+		const drawTextWithShadow = function(s, x, y) {
+			g.strokeStyle = "rgb(0, 0, 0)";
+			g.fillStyle = "rgb(0, 0, 0)";
+			var shw = 0.001
+			drawText(s, x + shw, y + shw)
+			drawText(s, x - shw, y - shw)
+			drawText(s, x + shw, y - shw)
+			drawText(s, x - shw, y + shw)
+			g.strokeStyle = "rgb(255, 255, 255)";
+			g.fillStyle = "rgb(255, 255, 255)";
+			drawText(s, x, y)
+		}
+		
+		var fh = colh / 4;
+		g.font = fh + "px Courier";
+		g.textAlign = "center";
+		drawTextWithShadow(nearcol[1], 0.5, 1 - (colwgap + colh / 2 - fh / 2) / pos[3])
+		
+//		drawText(num2color(ncol), 0.95 - 0.15 / 2, 0.55);
+
+
+//		g.drawImage(img, ox - img.width / 2, oy - img.height / 2)
+		
+		cnt++;
+		requestAnimationFrame(draw);
+	};
+	draw();
+};
+
+</script>
+<style>
+body {
+	margin: 0;
+	background-color: black;
+}
+#video {
+	display: block;
+	width: 100%;
+	transform: scale(0.01);
+}
+#canvas {
+	z-index: 3;
+	display: block;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+#debug {
+	position: absolute;
+	top: 0;
+	left: 0;
+	background-color: rgb(1, 1, 1, 0.5);
+	z-index: 2;
+	color: white;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<video id="video" autoplay playsinline></video>
+<div id=debug></div>
+</body>
+</html>
